@@ -11,6 +11,9 @@ python
 >>> Base.metadata.create_all(bind=engine)
 >>> exit()
 
+run venv
+source venv/bin/activate
+
 Put license-data.csv on root
 
 Run this
