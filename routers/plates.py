@@ -17,29 +17,26 @@ def get_db():
 def get_plates(
     page: int = Query(1, ge=1),
     per_page: int = Query(10, ge=1, le=100),
-    search: str = "",
-    tax_status: str = "",
+    search: str = Query("", description="Search by plate number or owner"),
+    tax_status: str = Query("", description="Filter by tax status (e.g., valid, expired)"),
     db: Session = Depends(get_db),
 ):
     query = db.query(PlateRegistry)
 
-    # Apply search filter (plate number or registered owner)
+    # Filter by search keyword (plate or owner)
     if search:
         query = query.filter(
             or_(
                 PlateRegistry.plate_number.ilike(f"%{search}%"),
-                PlateRegistry.registered_owner.ilike(f"%{search}%")
+                # PlateRegistry.registered_owner.ilike(f"%{search}%")
             )
         )
 
-    # Filter by tax status if specified
+    # Filter by tax status
     if tax_status:
-        query = query.filter(PlateRegistry.tax_status.ilike(tax_status.lower()))
+        query = query.filter(PlateRegistry.tax_status.ilike(f"%{tax_status}%"))
 
-    # Get total count for pagination
     total = query.with_entities(func.count()).scalar()
-
-    # Apply pagination
     results = query.offset((page - 1) * per_page).limit(per_page).all()
 
     return {

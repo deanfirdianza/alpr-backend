@@ -1,8 +1,11 @@
-from fastapi import APIRouter, FastAPI, HTTPException
+from fastapi import APIRouter, FastAPI, HTTPException, Depends
+from sqlalchemy.orm import Session
+from datetime import datetime, date, timezone
 from ultralytics import YOLO
-from datetime import datetime
+from database import SessionLocal
+from routers.scan import ScanResponse
+from models import PlateRegistry, ScanHistory
 import config
-# from scan import scan_frame
 import easyocr
 import cv2
 import numpy as np
@@ -10,16 +13,6 @@ import re
 import os
 
 router = APIRouter()
-
-@router.get("/scan_by_image")
-def scanByImage():
-    try:
-        result = scan_frame()
-        if not result["plate_number"]:
-            return {"message": "No valid plate detected.", **result}
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 MODEL_PATH = "best.pt"
 OCR_LANGS = ['en']
@@ -39,10 +32,20 @@ def clean_ocr_text(raw_text: str) -> str:
         text = prefix + digits[:4] + suffix
     return text
 
-def scan_frame() -> dict:
+def format_plate(plate: str) -> str:
+    match = re.match(r"^([A-Z]{1,2})(\d{1,4})([A-Z]{0,3})$", plate)
+    if not match:
+        return plate
+    prefix, number, suffix = match.groups()
+    parts = [prefix, number]
+    if suffix:
+        parts.append(suffix)
+    return "-".join(parts)
+
+def scan_frame() -> list:
+    db: Session = SessionLocal()
     temp_filename = f"frame_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
 
-    # Download snapshot
     cap = cv2.VideoCapture(config.CAMERA_URL)
     ret, frame = cap.read()
     cap.release()
@@ -51,15 +54,15 @@ def scan_frame() -> dict:
         raise RuntimeError("Failed to capture image from video feed.")
 
     cv2.imwrite(temp_filename, frame)
-
-    # Run YOLO detection
     image = cv2.imread(temp_filename)
     results = model(image)[0]
 
+    result = []
     for box in results.boxes:
         conf = float(box.conf)
         if conf < CONF_THRESHOLD:
             continue
+
         x1, y1, x2, y2 = map(int, box.xyxy[0].cpu().numpy())
         cropped = image[y1:y2, x1:x2]
         ocr_result = reader.readtext(cropped)
@@ -76,12 +79,44 @@ def scan_frame() -> dict:
         plate_match = re.search(r'[A-Z]{1,2}\d{1,4}[A-Z]{0,3}', cleaned_text)
         plate_number = plate_match.group() if plate_match else None
 
-        os.remove(temp_filename)
+        if not plate_number:
+            continue
 
-        return {
-            "plate_number": plate_number,
-            "confidence": round(conf, 4),
-        }
+        formatted_plate = format_plate(plate_number)
+        plate = db.query(PlateRegistry).filter_by(plate_number=formatted_plate).first()
+
+        if plate:
+            tax_status = "Paid" if plate.expired_at >= date.today() else "Unpaid"
+            plate.tax_status = tax_status
+            plate.last_checked = datetime.now(timezone.utc)
+        else:
+            tax_status = "Not Found"
+
+        history = ScanHistory(
+            plate_number=formatted_plate,
+            timestamp=datetime.now(timezone.utc),
+            confidence=str(conf),
+        )
+        db.add(history)
+        db.commit()
+
+        result.append(ScanResponse(
+            plate_number=plate_number,
+            formatted_plate=formatted_plate,
+            confidence=conf,
+            tax_status=tax_status,
+            timestamp=history.timestamp,
+        ))
 
     os.remove(temp_filename)
-    return {"plate_number": None, "confidence": 0.0}
+    return result[0]
+
+@router.get("/scan_by_image")
+def scanByImage():
+    try:
+        results = scan_frame()
+        if not results:
+            return {"message": "No valid plate detected."}
+        return results
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

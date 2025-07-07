@@ -12,6 +12,7 @@ router = APIRouter()
 
 class ScanResponse(BaseModel):
     plate_number: str
+    formatted_plate: str
     confidence: float
     tax_status: str
     timestamp: datetime
@@ -39,7 +40,7 @@ def scan():
         plate = db.query(PlateRegistry).filter_by(plate_number=plate_number).first()
 
         if plate:
-            tax_status = "paid" if plate.expired_at >= date.today() else "unpaid"
+            tax_status = "Paid" if plate.expired_at >= date.today() else "Unpaid"
             plate.tax_status = tax_status
             plate.last_checked = datetime.utcnow()
         else:
