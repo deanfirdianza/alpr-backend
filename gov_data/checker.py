@@ -11,4 +11,4 @@ def get_tax_status(plate_number: str) -> str:
     if not plate:
         return "not found"
     
-    return "Paid" if plate.expired_at >= date.today() else "Unpaid"
+    return "Lunas" if plate.expired_at >= date.today() else "Belum Lunas"

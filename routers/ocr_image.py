@@ -86,7 +86,7 @@ def scan_frame() -> list:
         plate = db.query(PlateRegistry).filter_by(plate_number=formatted_plate).first()
 
         if plate:
-            tax_status = "Paid" if plate.expired_at >= date.today() else "Unpaid"
+            tax_status = "Lunas" if plate.expired_at >= date.today() else "Belum Lunas"
             plate.tax_status = tax_status
             plate.last_checked = datetime.now(timezone.utc)
         else:
