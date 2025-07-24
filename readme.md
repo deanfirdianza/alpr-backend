@@ -24,3 +24,9 @@ http://127.0.0.1:8000/docs#/
 
 migrate data using
 PYTHONPATH=. python scripts/import_plate_registry.py
+
+exit venv
+>>> deactivate
+
+install req
+>>>pip install -r requirements.txt

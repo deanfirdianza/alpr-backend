@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import scan, plates, history, ocr_toggle, websocket, auto_ocr, ocr_image
+from routers import scan, plates, history, ocr_toggle, websocket, auto_ocr, ocr_image, healthcheck
 from stream import video_feed_app
 import config
 
@@ -24,6 +24,7 @@ app.include_router(ocr_toggle.router)
 app.include_router(websocket.router)
 app.include_router(auto_ocr.router)
 app.include_router(ocr_image.router)
+app.include_router(healthcheck.router)
 
 # Video stream route
 app.mount("/video_feed", video_feed_app)
