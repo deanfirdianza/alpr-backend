@@ -30,3 +30,14 @@ exit venv
 
 install req
 >>>pip install -r requirements.txt
+
+---
+ps1
+
+.\setup.ps1 setup       # Setup venv + install pip requirements
+.\setup.ps1 db-up       # Start Docker DB
+.\setup.ps1 migrate     # Create tables
+.\setup.ps1 import      # Import license-data.csv
+.\setup.ps1 run         # Start FastAPI app
+.\setup.ps1 db-down     # Stop and remove DB
+.\setup.ps1 clean       # Remove __pycache__ folders
